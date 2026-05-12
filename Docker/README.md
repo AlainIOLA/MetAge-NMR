@@ -21,6 +21,7 @@ The application expects the input directory (referred to as NMR_DATA) to contain
 
 The script dynamically searches inside each sample's subfolders to identify the required experiments based on the pulse sequence recorded in the `acqus` file. The structure should look like this:
 
+```
 NMR_DATA/
 │
 ├── Sample_001/                  <- Name of the sample (used in the final report)
@@ -39,6 +40,7 @@ NMR_DATA/
 │
 ├── Sample_002/                  <- Next sample
 │   ├── ...
+```
 
 IMPORTANT REQUIREMENTS:
 1. Processed data is mandatory: The tool relies on previously processed data (pdata/1). Make sure the spectra have been processed following the standard Bruker IVDr protocols before running the tool.
