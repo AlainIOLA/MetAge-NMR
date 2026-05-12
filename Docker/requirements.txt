@@ -1,0 +1,8 @@
+nmrglue
+scipy
+pandas
+openpyxl
+joblib
+scikit-learn==1.4.1.post1
+tpot
+jupyter
