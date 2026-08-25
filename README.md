@@ -1,6 +1,13 @@
 # MetAge paper code
 
-This repository contains the notebook `MetAgePaperCode.ipynb` and a directory named `Docker`. The `Docker` folder includes a pre-configured environment that completely automates the quantification of metabolites and the prediction of clinical biomarkers, without the need to manually install or run the code. Detailed instructions for this tool can be found in its own `README.md` inside the `Docker` folder.
+This repository contains the code and pretrained models associated with the MetAge study.
+
+The main notebook, `MetAgePaperCode.ipynb`, includes the workflows used for NMR spectral processing, model development, application of the pretrained metabolic age models, and SHAP-based interpretation.
+
+The `Docker` directory contains a pre-configured environment that automates the quantification of metabolites and prediction of clinical biomarkers from NMR spectra, without the need to manually install or execute the underlying quantification tools. Detailed instructions are provided in the `README.md` located inside the `Docker` folder.
+
+The `models` directory contains the pretrained metabolic age models and their corresponding fitted standard scalers, allowing the published models to be directly applied to independent datasets without retraining.
+
 
 ## Prerequisites
 
@@ -16,29 +23,72 @@ To run the notebook, you will need a Python environment with Jupyter installed a
 * `joblib`
 * `shap`
 
+
 ## Required files
 
-The notebook requires the following auxiliary data file to process the spectra:
+The following auxiliary file is required for processing NOESY spectra:
 
-* `dataPPMS_NOESY.csv`: Contains the reference ppm values required for the processing and calibration of the NOESY spectra.
+* `dataPPMS_NOESY.csv`: reference ppm values used for processing and calibration of the NOESY spectra.
 
-Ensure that this file is placed in the same directory as the notebook before starting execution.
+The pretrained metabolic age models and their corresponding scalers are provided in the `models` directory:
+
+* `modelInterpretable.bin`: pretrained metabolic age model based on quantified metabolites and clinical biomarkers.
+* `stdScalerInterpretable.bin`: fitted standard scaler corresponding to `modelInterpretable.bin`.
+* `modelNOESY.bin`: pretrained metabolic age model based on binned NOESY spectra.
+* `stdScalerNOESY.bin`: fitted standard scaler corresponding to `modelNOESY.bin`.
+
+Each model must always be used with its corresponding scaler.
+
 
 ## Notebook structure and usage
 
 The notebook is organized into sequential blocks containing the following main functions:
 
+
 ### 1. Spectra loading and processing (`load_nmr_spectra`)
-This function processes raw Bruker NMR directories. It automatically searches for the appropriate experiment (NOESY or CPMG), applies a baseline correction using Asymmetric Least Squares (AsLS), and calibrates the chemical shift targeting the alanine doublet signal.
+
+This function processes raw Bruker NMR directories. It automatically searches for the appropriate experiment (NOESY or CPMG), applies baseline correction using Asymmetric Least Squares (AsLS), and calibrates the chemical shift using the alanine doublet signal.
+
 
 ### 2. Dimensionality reduction (`bin_spectra`)
-It groups consecutive data points (without interpolation) to reduce the dimensionality of the high-resolution spectra to a specific bin size. The resulting matrices are exported automatically.
+
+This function groups consecutive spectral data points, without interpolation, to reduce the dimensionality of high-resolution spectra to a specified bin size. The resulting matrices can be directly used as input for model development or prediction with the NOESY-based metabolic age model.
+
 
 ### 3. Predictive model training (`run_tpot_train`)
-This block uses genetic programming via the TPOT library to automatically search and optimize the best regression model pipeline to predict clinical variables, such as age. It exports the best model and its corresponding standard scaler as binary files.
+
+This block uses genetic programming through the TPOT library to search and optimize regression pipelines for the prediction of clinical variables such as chronological age. It exports the selected model and its corresponding fitted standard scaler as binary files.
+
 
 ### 4. Model evaluation and execution (`run_model`)
-This function handles the evaluation of the predictive models. It integrates the data with the clinical metadata and splits the dataset into training and testing subsets. After performing an optional K-Fold cross-validation to assess the model's robustness, it executes a final training phase. Ultimately, it exports the fully trained model and its corresponding standard scaler as binary files.
 
-### 5. Application to new cohorts and interpretability (`analyze_age_new_sample_shap_stats`)
-The `analyze_age_new_sample_shap_stats` function evaluates new datasets against the established reference models (supporting both TPOT and PyTorch pipelines). It first uses a high-precision sampling algorithm to strictly match the chronological age distributions between the reference pool and the new cohort. Once matched, it predicts the metabolic age and categorizes each sample's "metabolic distortion" (accelerated, normal, or decelerated aging), computing robust statistical tests (such as Chi-square, Kolmogorov-Smirnov, and Welch's t-test) to compare the populations. Finally, it performs an in-depth SHAP interpretability analysis, generating summary plots, evaluating the delta of SHAP values between groups, and calculating the Z-score shifts of the original spectral variables to reveal the specific metabolic drivers behind the predictions.
+This function evaluates predictive models by integrating input data with clinical metadata and splitting the dataset into training and testing subsets. Optional K-fold cross-validation can be used to assess model robustness, followed by final model training and export of the fitted model and standard scaler.
+
+
+### 5. Preprocessing for the interpretable MetAge model (`preprocess_metage_input`)
+
+This function prepares quantified metabolite and clinical biomarker data for application of the interpretable metabolic age model.
+
+The input is expected to correspond to the quantified output generated by the workflow provided in this repository. The function verifies that all variables required by the model are present, removes additional columns, restores the required feature order, removes variables excluded during model development, and generates the derived variables used by the final model.
+
+The resulting dataset can be directly used with `stdScalerInterpretable.bin` and `modelInterpretable.bin`.
+
+
+### 6. Application of pretrained models (`predict_metabolic_age`)
+
+The `predict_metabolic_age` function generates metabolic age predictions from an independent dataset using a pretrained model and its corresponding fitted scaler, without retraining.
+
+The same function can be used with either of the two MetAge models:
+
+* **Interpretable model:** use the output of `preprocess_metage_input` together with `stdScalerInterpretable.bin` and `modelInterpretable.bin`.
+* **NOESY model:** use the appropriately processed and binned NOESY dataset (bin50) together with `stdScalerNOESY.bin` and `modelNOESY.bin`.
+
+An optional metadata file can also be provided. If the metadata contain an `age` column, samples are matched by sample identifier and the function reports the Pearson correlation between chronological and predicted metabolic age and generates a corresponding scatter plot.
+
+
+### 7. Application to new cohorts and interpretability (`analyze_age_new_sample_shap_stats`)
+
+The `analyze_age_new_sample_shap_stats` function provides the extended cohort-level analysis used in the study. It compares independent datasets with the reference population, performs chronological-age matching, predicts metabolic age, evaluates metabolic age distortion, and conducts statistical comparisons between populations.
+
+The function additionally performs SHAP-based interpretability analyses, including feature-level SHAP summaries, differences between cohorts, and Z-score shifts of the original variables to identify the metabolic features driving the predictions.
+
